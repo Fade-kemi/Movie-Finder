@@ -1,4 +1,4 @@
-import {useState, useEffect} from 'react'
+import {useState, useEffect, useRef} from 'react'
 import SearchBar from './Component/searchBar'
 import Spinner from './Component/Spinner'
 import ErrorMessage from './Component/ErrorMessage'
@@ -16,7 +16,9 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedMovie, setSelectedMovie] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
   const [view, setView] = useState("search");
+  const detailRequest = useRef(null);
 
 
   const API_KEY = import.meta.env.VITE_TMDB_API_KEY;
@@ -81,18 +83,36 @@ function App() {
   }
 
   const openModel = async (movieId) => {
+    detailRequest.current?.abort();
+    const controller = new AbortController();
+    detailRequest.current = controller;
+    setDetailsLoading(true);
+    setSelectedMovie(null);
     setError(null);
     try { 
-      const res = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?api_key=${API_KEY}`);
+      const params = new URLSearchParams({ api_key: API_KEY, append_to_response: "credits" });
+      const res = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?${params}`, {
+        signal: controller.signal,
+      });
       if (!res.ok) throw new Error("Failed to fetch movie details");
       const data = await res.json();
-      setSelectedMovie(data);
+      if (!controller.signal.aborted) setSelectedMovie(data);
     } catch (err) {
-      setError ("Failed to fetch movie details.");
+      if (err.name !== "AbortError") setError("Failed to fetch movie details.");
+    } finally {
+      if (detailRequest.current === controller) {
+        detailRequest.current = null;
+        setDetailsLoading(false);
+      }
     }
   }
 
-  const closeModel = () => setSelectedMovie(null);
+  const closeModel = () => {
+    detailRequest.current?.abort();
+    detailRequest.current = null;
+    setDetailsLoading(false);
+    setSelectedMovie(null);
+  };
 
   const toggleFavorite = (movie) => {
     const isFavorite = favorites.some((fav) => fav.id === movie.id);
@@ -133,7 +153,7 @@ function App() {
       </div>
       {view === "search" && (
         <div className="w-full max-w-md mb-6">
-          <SearchBar searchTerm={searchTerm} setSearchTerm={setSearchTerm} onSearch={handleSearch} />
+          <SearchBar searchTerm={searchTerm} onSearch={handleSearch} />
         </div>
       )}
       {loading && <Spinner />}
@@ -165,12 +185,13 @@ function App() {
         </div>
       )}
 
-      {selectedMovie && (
+      {(selectedMovie || detailsLoading) && (
         <MovieDetailsModal 
         movie={selectedMovie} 
+        loading={detailsLoading}
         onClose={closeModel}
-        isFavorite = {isFavorite(selectedMovie.id)}
-         onToggleFavorite= {() => toggleFavorite(selectedMovie)} />
+        isFavorite={selectedMovie ? isFavorite(selectedMovie) : false}
+        onToggleFavorite={() => selectedMovie && toggleFavorite(selectedMovie)} />
       )}
     </div>
   )

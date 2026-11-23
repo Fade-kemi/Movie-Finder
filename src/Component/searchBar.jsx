@@ -1,28 +1,35 @@
-import React, { useState } from "react";
+import { useState } from "react";
 
-const SearchBar = ({onSearch}) => {
-  const[term, setTerm] =useState("");
+const SearchBar = ({ searchTerm, onSearch }) => {
+  const [term, setTerm] = useState(searchTerm);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     onSearch(term);
   };
 
+  const handleClear = () => {
+    setTerm("");
+    onSearch("");
+  };
+
   return (
-    <div>
-      <form onSubmit={handleSubmit}
-      className="flex gap-2 justify-center mb-4"
-      >
-        <input
-          type="text"
-          placeholder="Search movies..."
-          value={term}
-          onChange={(e) => setTerm(e.target.value)}
-          className="input input-success w-full max-w-xs my-6"
-        />
-        <button type="submit" className="btn btn-success">Search</button>
-      </form>
-    </div>
+    <form onSubmit={handleSubmit} role="search" className="mb-4 flex w-full flex-nowrap items-center justify-center gap-2">
+      <input
+        type="text"
+        placeholder="Search movies..."
+        value={term}
+        onChange={(e) => setTerm(e.target.value)}
+        aria-label="Search movies"
+        className="input input-success min-w-0 flex-1"
+      />
+      {term && (
+        <button type="button" className="btn btn-ghost shrink-0" onClick={handleClear} aria-label="Clear search">
+          Clear
+        </button>
+      )}
+      <button type="submit" className="btn btn-success shrink-0">Search</button>
+    </form>
   )
 }
 
